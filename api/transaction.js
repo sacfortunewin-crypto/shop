@@ -1,6 +1,8 @@
 const {
   buildTransactionPayload,
   errorMessage,
+  notifyUtmify,
+  orderFromTransaction,
   pagouApiRequest,
   readJson,
   requireMethod,
@@ -35,6 +37,17 @@ module.exports = async function handler(req, res) {
 
   const data = body.data && typeof body.data === "object" ? body.data : body;
   const transactionId = data.id || body.transactionId || null;
+  const transaction = {
+    ...data,
+    id: transactionId || data.id,
+    external_ref: data.external_ref || payload.external_ref,
+    method: data.method || payload.method,
+    amount: data.amount || payload.amount,
+    currency: data.currency || payload.currency || "BRL",
+    status: data.status || "pending",
+    metadata: data.metadata || payload.metadata,
+  };
+  const utmify = await notifyUtmify(orderFromTransaction(transaction, req), transaction);
 
   if (payload.method === "pix") {
     const pix = data.pix && typeof data.pix === "object" ? data.pix : {};
@@ -46,6 +59,7 @@ module.exports = async function handler(req, res) {
       amount: data.amount || payload.amount,
       currency: data.currency || "BRL",
       requestId: body.requestId || null,
+      utmify,
       pix: {
         qrCode: pix.qr_code || body.pixQrCode || null,
         qrCodeImage: pix.qr_code_image || body.pixQrCodeImage || null,
@@ -60,6 +74,7 @@ module.exports = async function handler(req, res) {
     ...data,
     transactionId,
     requestId: body.requestId || null,
+    utmify,
     transaction: data,
   });
 };
