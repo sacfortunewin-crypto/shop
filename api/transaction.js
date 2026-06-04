@@ -9,6 +9,22 @@ const {
   sendJson,
 } = require("./_lib/pagou");
 
+function utmifyLogMessage(utmify) {
+  if (!utmify || typeof utmify !== "object") return null;
+  const body = utmify.body && typeof utmify.body === "object" ? utmify.body : {};
+  const firstError = Array.isArray(body.errors) ? body.errors[0] : null;
+
+  return (
+    body.message ||
+    body.detail ||
+    body.error ||
+    body.title ||
+    (firstError && (firstError.message || firstError.detail || firstError.error || String(firstError))) ||
+    utmify.message ||
+    null
+  );
+}
+
 module.exports = async function handler(req, res) {
   if (!requireMethod(req, res, "POST")) return;
 
@@ -48,6 +64,16 @@ module.exports = async function handler(req, res) {
     metadata: data.metadata || payload.metadata,
   };
   const utmify = await notifyUtmify(orderFromTransaction(transaction, req), transaction);
+  console.log("[checkout:utmify-pending]", {
+    transactionId,
+    externalRef: transaction.external_ref || null,
+    method: transaction.method || null,
+    pagouStatus: transaction.status || null,
+    amount: transaction.amount || null,
+    utmifySent: Boolean(utmify && utmify.sent),
+    utmifyStatus: utmify ? utmify.status : null,
+    utmifyMessage: utmifyLogMessage(utmify),
+  });
 
   if (payload.method === "pix") {
     const pix = data.pix && typeof data.pix === "object" ? data.pix : {};
