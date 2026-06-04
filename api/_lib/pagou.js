@@ -344,13 +344,21 @@ function parseMetadata(transaction) {
 function normalizeTransactionFromWebhook(body) {
   const data =
     body && typeof body.data === "object" && body.data !== null
-      ? body.data
+      ? body.data.object && typeof body.data.object === "object"
+        ? body.data.object
+        : body.data
       : body && typeof body.transaction === "object" && body.transaction !== null
         ? body.transaction
         : body || {};
 
   const transaction = { ...data };
-  transaction.event_type = body.event_type || body.event || body.type || transaction.event_type || "";
+  const topLevelEvent = String(body.event || "");
+  transaction.event_type =
+    transaction.event_type ||
+    body.event_type ||
+    body.type ||
+    (topLevelEvent.includes(".") ? topLevelEvent : "") ||
+    "";
   return transaction;
 }
 
@@ -402,17 +410,24 @@ function utmifyStatus(pagouStatus, eventType) {
   return "waiting_payment";
 }
 
-function eventSeen(eventId) {
-  if (!eventId) return false;
+function cleanupSeenEvents() {
   const now = Date.now();
 
   for (const [key, seenAt] of seenEvents.entries()) {
     if (now - seenAt > 1000 * 60 * 60) seenEvents.delete(key);
   }
+}
 
-  if (seenEvents.has(eventId)) return true;
-  seenEvents.set(eventId, now);
-  return false;
+function hasSeenEvent(eventId) {
+  if (!eventId) return false;
+  cleanupSeenEvents();
+  return seenEvents.has(eventId);
+}
+
+function markEventSeen(eventId) {
+  if (!eventId) return;
+  cleanupSeenEvents();
+  seenEvents.set(eventId, Date.now());
 }
 
 async function notifyUtmify(order, transaction) {
@@ -504,7 +519,8 @@ module.exports = {
   buildTransactionPayload,
   env,
   errorMessage,
-  eventSeen,
+  hasSeenEvent,
+  markEventSeen,
   normalizeTransactionFromWebhook,
   notifyUtmify,
   orderFromTransaction,

@@ -1,6 +1,7 @@
 const {
   env,
-  eventSeen,
+  hasSeenEvent,
+  markEventSeen,
   normalizeTransactionFromWebhook,
   notifyUtmify,
   orderFromTransaction,
@@ -15,6 +16,19 @@ const NOTIFIABLE_EVENTS = new Set([
   "transaction.partially_refunded",
   "transaction.chargedback",
   "transaction.cancelled",
+]);
+
+const NOTIFIABLE_STATUSES = new Set([
+  "paid",
+  "captured",
+  "authorized",
+  "refunded",
+  "partially_refunded",
+  "chargedback",
+  "canceled",
+  "cancelled",
+  "expired",
+  "refused",
 ]);
 
 module.exports = async function handler(req, res) {
@@ -49,13 +63,14 @@ module.exports = async function handler(req, res) {
     transaction.event_id ||
     `${eventType}:${transaction.id || transaction.external_ref || ""}:${transaction.status || ""}`;
 
-  if (eventSeen(eventId)) {
-    sendJson(res, 200, { received: true, duplicated: true });
+  if (hasSeenEvent(eventId)) {
+    sendJson(res, 200, { received: true, duplicate: true, eventId });
     return;
   }
 
   let utmify = null;
-  if (NOTIFIABLE_EVENTS.has(eventType)) {
+  const status = String(transaction.status || "");
+  if (NOTIFIABLE_EVENTS.has(eventType) || NOTIFIABLE_STATUSES.has(status)) {
     const order = orderFromTransaction(transaction, req);
     utmify = await notifyUtmify(order, transaction);
 
@@ -69,5 +84,6 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  sendJson(res, 200, { received: true, utmify });
+  markEventSeen(eventId);
+  sendJson(res, 200, { received: true, eventId, eventType, utmify });
 };
