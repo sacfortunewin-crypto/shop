@@ -410,6 +410,11 @@ function utmifyStatus(pagouStatus, eventType) {
   return "waiting_payment";
 }
 
+function cents(value, fallback = 0) {
+  const amount = Number(value);
+  return Number.isFinite(amount) ? Math.max(0, Math.round(amount)) : fallback;
+}
+
 function cleanupSeenEvents() {
   const now = Date.now();
 
@@ -437,8 +442,13 @@ async function notifyUtmify(order, transaction) {
   const pagouStatus = String(transaction.status || "pending");
   const eventType = String(transaction.event_type || "");
   const status = utmifyStatus(pagouStatus, eventType);
-  const amountCents = Number(transaction.amount || order.amountCents || CHECKOUT_PRODUCT_PRICE_CENTS);
-  const feeCents = Math.max(0, Number(transaction.fee || 0));
+  const amountCents = cents(transaction.amount || order.amountCents, CHECKOUT_PRODUCT_PRICE_CENTS);
+  const rawFeeCents = cents(
+    transaction.fee || transaction.gateway_fee || transaction.gatewayFee || transaction.feeInCents,
+    0
+  );
+  const feeCents = rawFeeCents > 0 ? rawFeeCents : 1;
+  const userCommissionCents = Math.max(1, amountCents - feeCents);
   const customer = order.customer || {};
   const tracking = normalizeTracking(order.tracking || {});
 
@@ -472,7 +482,7 @@ async function notifyUtmify(order, transaction) {
     commission: {
       totalPriceInCents: amountCents,
       gatewayFeeInCents: feeCents,
-      userCommissionInCents: Math.max(0, amountCents - feeCents),
+      userCommissionInCents: userCommissionCents,
       currency: transaction.currency || "BRL",
     },
     isTest: checkoutEnvironment() === "sandbox",
