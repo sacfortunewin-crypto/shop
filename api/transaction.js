@@ -97,6 +97,8 @@ module.exports = async function handler(req, res) {
   }
 
   sendJson(res, 200, {
+    success: true,
+    data,
     ...data,
     transactionId,
     requestId: body.requestId || null,
