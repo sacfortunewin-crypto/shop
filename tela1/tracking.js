@@ -4,20 +4,8 @@
   var STORAGE_KEY = "utmify_tracking";
   var TRACKING_KEYS = [
     "src", "sck", "xcod", "utm_source", "utm_campaign", "utm_medium",
-    "utm_content", "utm_term", "fbclid", "gclid", "ttclid", "msclkid"
+    "utm_content", "utm_term"
   ];
-
-  function readCookie(name) {
-    var escaped = name.replace(/[.$?*|{}()[\]\\/+^]/g, "\\$&");
-    var match = document.cookie.match(new RegExp("(?:^|; )" + escaped + "=([^;]*)"));
-    return match ? decodeURIComponent(match[1]) : "";
-  }
-
-  function writeCookie(name, value, days) {
-    var expires = new Date(Date.now() + days * 864e5).toUTCString();
-    document.cookie = name + "=" + encodeURIComponent(value) +
-      "; expires=" + expires + "; path=/; SameSite=Lax";
-  }
 
   function readStored(storage) {
     try { return JSON.parse(storage.getItem(STORAGE_KEY) || "{}"); } catch (_) { return {}; }
@@ -45,16 +33,6 @@
     });
 
     if (!data.sck && data.xcod) data.sck = data.xcod;
-
-    var fbclid = data.fbclid || params.get("fbclid");
-    var fbp = readCookie("_fbp") || data._fbp || data.fbp;
-    var fbc = readCookie("_fbc") || data._fbc || data.fbc;
-    if (!fbc && fbclid) {
-      fbc = "fb.1." + Date.now() + "." + fbclid;
-      writeCookie("_fbc", fbc, 90);
-    }
-    if (fbp) data._fbp = data.fbp = fbp;
-    if (fbc) data._fbc = data.fbc = fbc;
 
     store(data);
     return data;
